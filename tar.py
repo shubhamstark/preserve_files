@@ -126,6 +126,18 @@ def delete_files(harness_file='harness.json'):
             print(f"  File not found, skipping: {file_path}")
     
     print("Deletion completed")
+    
+def delete_all_tar_files():
+    """Delete all tar files in the current directory."""
+    print("Deleting all tar files in the current directory...")
+    for file in os.listdir('.'):
+        if file.endswith('.tar.gz') or file.endswith('.tgz') or file.endswith('.tar.bz2') or file.endswith('.tar'):
+            try:
+                os.remove(file)
+                print(f"  Deleted: {file}")
+            except Exception as e:
+                print(f"  Error deleting {file}: {e}")
+    print("All tar files deleted")
 
 
 def main():
@@ -135,6 +147,7 @@ def main():
         print("  python tar.py tar [archive_name]       - Create tar archive")
         print("  python tar.py untar [archive_name]     - Extract tar archive")
         print("  python tar.py delete                   - Delete all files")
+        print("  python tar.py delete_tar               - Delete all tar files")
         sys.exit(1)
     
     command = sys.argv[1].lower()
@@ -150,9 +163,12 @@ def main():
     elif command == 'delete':
         delete_files()
     
+    elif command == 'delete_tar':
+        delete_all_tar_files()
+    
     else:
         print(f"Unknown command: {command}")
-        print("Valid commands: tar, untar, delete")
+        print("Valid commands: tar, untar, delete, delete_tar")
         sys.exit(1)
 
 

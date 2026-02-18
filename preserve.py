@@ -99,7 +99,7 @@ class Preserver:
             print(f"✓ Successfully uploaded {self.archive_name} to {s3_path}")
             
             # Optional: Clean up local tar file
-            # os.remove(self.archive_name)
+            os.remove(self.archive_name)
             
             return True
             
