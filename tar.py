@@ -4,7 +4,7 @@ Script to tar, untar, and delete files specified in harness.json
 """
 
 import json
-import tarfile
+import subprocess
 import os
 import sys
 from pathlib import Path
@@ -37,16 +37,37 @@ def tar_files(archive_name='preserved_files.tar.gz', harness_file='harness.json'
     
     print(f"Creating archive: {archive_name}")
     
-    with tarfile.open(archive_name, 'w:gz') as tar:
-        for file_path in files_to_tar:
-            if os.path.exists(file_path):
-                # Add file with its full path preserved
-                print(f"  Adding: {file_path}")
-                tar.add(file_path, arcname=file_path)
-            else:
-                print(f"  Warning: File not found, skipping: {file_path}")
+    # Filter existing files and warn about missing ones
+    existing_files = []
+    for file_path in files_to_tar:
+        if os.path.exists(file_path):
+            print(f"  Adding: {file_path}")
+            existing_files.append(file_path)
+        else:
+            print(f"  Warning: File not found, skipping: {file_path}")
     
-    print(f"Archive created successfully: {archive_name}")
+    if not existing_files:
+        print("No files to tar")
+        return
+    
+    # Determine compression flag
+    if archive_name.endswith('.tar.gz') or archive_name.endswith('.tgz'):
+        tar_cmd = ['tar', '-czf', archive_name]
+    elif archive_name.endswith('.tar.bz2'):
+        tar_cmd = ['tar', '-cjf', archive_name]
+    else:
+        tar_cmd = ['tar', '-cf', archive_name]
+    
+    # Add files to command
+    tar_cmd.extend(existing_files)
+    
+    # Execute tar command
+    try:
+        result = subprocess.run(tar_cmd, capture_output=True, text=True, check=True)
+        print(f"Archive created successfully: {archive_name}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating archive: {e.stderr}")
+        sys.exit(1)
 
 
 def untar_files(archive_name='preserved_files.tar.gz'):
@@ -60,45 +81,61 @@ def untar_files(archive_name='preserved_files.tar.gz'):
     
     print(f"Extracting from archive: {archive_name}")
     
-    # Auto-detect compression type
+    # Determine tar list command based on compression
+    if archive_name.endswith('.tar.gz') or archive_name.endswith('.tgz'):
+        list_cmd = ['tar', '-tzf', archive_name]
+    elif archive_name.endswith('.tar.bz2'):
+        list_cmd = ['tar', '-tjf', archive_name]
+    else:
+        list_cmd = ['tar', '-tf', archive_name]
+    
+    # Get list of files in archive
     try:
-        if archive_name.endswith('.tar.gz') or archive_name.endswith('.tgz'):
-            tar = tarfile.open(archive_name, 'r:gz')
-        elif archive_name.endswith('.tar.bz2'):
-            tar = tarfile.open(archive_name, 'r:bz2')
-        else:
-            tar = tarfile.open(archive_name, 'r')
-    except Exception as e:
-        print(f"Error opening archive: {e}")
+        result = subprocess.run(list_cmd, capture_output=True, text=True, check=True)
+        members = result.stdout.strip().split('\n')
+    except subprocess.CalledProcessError as e:
+        print(f"Error listing archive contents: {e.stderr}")
         return
     
-    with tar:
-        for member in tar.getmembers():
-            if member.isfile():
-                # Get the path from the archive
-                target_path = member.name
-                
-                # If path was absolute, tar strips the leading '/'
-                # Check if we need to add it back
-                # (Heuristic: if path starts with 'Users' or 'home', it was likely absolute)
-                if target_path.startswith('Users/') or target_path.startswith('home/'):
-                    target_path = '/' + target_path
-                # Otherwise, treat as relative to current directory
-                elif not os.path.isabs(target_path):
-                    target_path = os.path.abspath(target_path)
-                
-                print(f"  Extracting: {target_path}")
-                
-                # Create parent directories if they don't exist
-                parent_dir = os.path.dirname(target_path)
-                if parent_dir:
-                    os.makedirs(parent_dir, exist_ok=True)
-                
-                # Extract file content and write to exact location
-                file_obj = tar.extractfile(member)
-                if file_obj:
-                    with open(target_path, 'wb') as f:
-                        f.write(file_obj.read())
+    # Extract each file to its original location
+    for member in members:
+        # Skip empty lines and directories
+        if not member or member.endswith('/'):
+            continue
+        
+        target_path = member
+        
+        # If path was absolute, tar strips the leading '/'
+        # Check if we need to add it back
+        if target_path.startswith('Users/') or target_path.startswith('home/'):
+            target_path = '/' + target_path
+        elif not os.path.isabs(target_path):
+            target_path = os.path.abspath(target_path)
+        
+        print(f"  Extracting: {target_path}")
+        
+        # Create parent directories if they don't exist
+        parent_dir = os.path.dirname(target_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+        
+        # Determine extract command based on compression
+        if archive_name.endswith('.tar.gz') or archive_name.endswith('.tgz'):
+            extract_cmd = ['tar', '-xzf', archive_name, '-O', member]
+        elif archive_name.endswith('.tar.bz2'):
+            extract_cmd = ['tar', '-xjf', archive_name, '-O', member]
+        else:
+            extract_cmd = ['tar', '-xf', archive_name, '-O', member]
+        
+        # Extract file content and write to target location
+        try:
+            result = subprocess.run(extract_cmd, capture_output=True, check=True)
+            with open(target_path, 'wb') as f:
+                f.write(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print(f"  Error extracting {member}: {e.stderr}")
+        except IOError as e:
+            print(f"  Error writing to {target_path}: {e}")
     
     print("Extraction completed successfully")
 
