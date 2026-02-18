@@ -60,14 +60,32 @@ def untar_files(archive_name='preserved_files.tar.gz'):
     
     print(f"Extracting from archive: {archive_name}")
     
-    with tarfile.open(archive_name, 'r:gz') as tar:
+    # Auto-detect compression type
+    try:
+        if archive_name.endswith('.tar.gz') or archive_name.endswith('.tgz'):
+            tar = tarfile.open(archive_name, 'r:gz')
+        elif archive_name.endswith('.tar.bz2'):
+            tar = tarfile.open(archive_name, 'r:bz2')
+        else:
+            tar = tarfile.open(archive_name, 'r')
+    except Exception as e:
+        print(f"Error opening archive: {e}")
+        return
+    
+    with tar:
         for member in tar.getmembers():
             if member.isfile():
-                # Tar strips leading '/' from absolute paths
-                # Add it back if missing
+                # Get the path from the archive
                 target_path = member.name
-                if not target_path.startswith('/'):
+                
+                # If path was absolute, tar strips the leading '/'
+                # Check if we need to add it back
+                # (Heuristic: if path starts with 'Users' or 'home', it was likely absolute)
+                if target_path.startswith('Users/') or target_path.startswith('home/'):
                     target_path = '/' + target_path
+                # Otherwise, treat as relative to current directory
+                elif not os.path.isabs(target_path):
+                    target_path = os.path.abspath(target_path)
                 
                 print(f"  Extracting: {target_path}")
                 
