@@ -2,93 +2,75 @@
 # Test script for restore_from_state.sh approach
 # Tests recreating files directly from Terraform state
 
-set -e
+set +e  # Don't exit on error - we want to report where it failed
 
 echo "=========================================="
 echo "Test: State Restoration Approach"
 echo "=========================================="
 echo ""
 
-# Step 1: Verify initial state
-echo "=== Step 1: Verify initial Terraform state ==="
-terraform plan -detailed-exitcode > /dev/null 2>&1 && echo "✓ No changes - infrastructure matches configuration" || echo "⚠ Changes detected"
-echo ""
-
-# Step 2: Show current state
-echo "=== Step 2: Current Terraform state ==="
+# Step 1: Show current state
+echo "=== Step 1: Current Terraform state ==="
+echo "Command: terraform state list"
 terraform state list
 echo ""
 
-# Step 3: Verify files exist
-echo "=== Step 3: Verify files exist ==="
+# Step 2: Verify files exist
+echo "=== Step 2: Initialize files if needed ==="
 if [[ -d generated/ ]]; then
-    ls -la generated/
     echo "✓ Files exist"
 else
-    echo "✗ Files don't exist - running terraform apply first"
-    terraform apply -auto-approve > /dev/null
+    echo "Command: terraform apply -auto-approve"
+    terraform apply -auto-approve > /dev/null 2>&1
     echo "✓ Files created"
 fi
 echo ""
 
-# Step 4: Delete files to simulate problem
-echo "=== Step 4: Simulate files deleted (but state intact) ==="
-echo "Deleting generated files..."
+# Step 3: Delete files to simulate problem
+echo "=== Step 3: Simulate files deleted (state intact) ==="
+echo "Command: rm -rf generated/"
 rm -rf generated/
 if [[ ! -d generated/ ]]; then
     echo "✓ Files deleted"
 else
-    echo "✗ Failed to delete files"
+    echo "✗ TEST FAILED: Failed to delete files"
     exit 1
 fi
 echo ""
 
-# Step 5: Show Terraform plan without files
-echo "=== Step 5: Check Terraform Plan WITHOUT files ==="
-echo "Note: Even though state knows about resources, missing files cause issues"
-if terraform plan -no-color 2>&1 | grep -q "No changes"; then
-    echo "✓ Terraform sees no changes (files recreated by provider check)"
-else
-    echo "⚠ Terraform may want to make changes"
-fi
-echo ""
 
-# Step 6: Restore files from state
-echo "=== Step 6: Restore files from Terraform state ==="
-if ./restore_from_state.sh; then
-    echo "✓ Restoration script completed"
+
+# Step 4: Restore files from state
+echo "=== Step 4: Restore files from Terraform state ==="
+echo "Command: ./restore_from_state.sh"
+if ./restore_from_state.sh > /dev/null 2>&1; then
+    echo "✓ Files restored from state"
 else
-    echo "✗ Failed to restore files"
+    echo "✗ TEST FAILED: Failed to restore files from state"
     exit 1
 fi
 echo ""
 
-# Step 7: Verify restored files
-echo "=== Step 7: Verify restored files ==="
-if [[ -d generated/ ]]; then
-    ls -la generated/
-    echo ""
-    echo "Content sample:"
-    echo "--- generated/example.txt ---"
-    head -3 generated/example.txt
-    echo ""
-    echo "--- generated/config.json ---"
-    cat generated/config.json | jq .
-    echo ""
+# Step 5: Verify restored files
+echo "=== Step 5: Verify restored files ==="
+if [[ -d generated/ && -f generated/example.txt && -f generated/config.json ]]; then
     echo "✓ Files restored successfully"
 else
-    echo "✗ Files not restored"
+    echo "✗ TEST FAILED: Files not restored"
     exit 1
 fi
 echo ""
 
-# Step 8: Verify Terraform Plan after restoration
-echo "=== Step 8: Check Terraform Plan AFTER restoration ==="
+# Step 6: Verify Terraform Plan after restoration (Drift Detection)
+echo "=== Step 6: Drift Detection ==="
+echo "Command: terraform plan -detailed-exitcode"
+DRIFT_DETECTED=0
 if terraform plan -detailed-exitcode > /dev/null 2>&1; then
-    echo "✓ SUCCESS: No changes needed - files match state!"
+    echo "✓ No drift detected - files match Terraform state"
 else
-    echo "⚠ Terraform still sees changes (this may be expected for resources with dynamic content)"
-    terraform plan -no-color 2>&1 | tail -10
+    echo "✗ DRIFT DETECTED: Terraform sees changes after restoration"
+    terraform plan -no-color 2>&1 | tail -15
+    DRIFT_DETECTED=1
 fi
 echo ""
 
@@ -96,12 +78,17 @@ echo "=========================================="
 echo "Test Complete: State Restoration"
 echo "=========================================="
 echo ""
-echo "Summary:"
-echo "  - Files deleted (simulating missing files)"
-echo "  - Files restored from Terraform state"
-echo "  - Terraform state remains consistent"
-echo ""
-echo "Note: This approach works when:"
-echo "  ✓ Terraform state is available and intact"
-echo "  ✓ Resources exist in state"
-echo "  ✗ Does NOT work if resources removed from state"
+
+# Final test result
+if [[ $DRIFT_DETECTED -eq 0 ]]; then
+    echo "✓ TEST PASSED"
+    echo "=========================================="
+    echo "Files successfully restored from Terraform state"
+    echo "No drift detected after restoration"
+    exit 0
+else
+    echo "✗ TEST FAILED: Drift Detection"
+    echo "=========================================="
+    echo "Files were restored but do not match Terraform state"
+    exit 1
+fi
