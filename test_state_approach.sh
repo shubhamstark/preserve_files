@@ -1,7 +1,8 @@
 #!/bin/bash
 # Test script for restore_from_state.sh approach
 # Tests recreating files directly from Terraform state
-
+rm generated/example.txt & rm generated/config.json
+terraform apply -auto-approve   
 set +e  # Don't exit on error - we want to report where it failed
 
 echo "=========================================="
