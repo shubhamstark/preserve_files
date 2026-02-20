@@ -1,7 +1,5 @@
 {
     "preserved_files": [
-        "files/one/one.txt",
-        "two.txt",
         "generated/example.txt",
         "generated/config.json"
     ]
