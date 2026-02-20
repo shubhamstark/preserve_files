@@ -1,0 +1,1 @@
+{"application":"preserve-files-demo","environment":"test","features":["tar-archive","s3-upload","file-restoration"],"settings":{"cleanup":true,"compression":"gzip"},"version":"1.0.0"}
