@@ -1,0 +1,5 @@
+id,name,status,created_at
+1,resource-alpha,active,2026-02-24T10:00:00Z
+2,resource-beta,active,2026-02-24T10:15:00Z
+3,resource-gamma,pending,2026-02-24T10:30:00Z
+4,resource-delta,active,2026-02-24T10:45:00Z
