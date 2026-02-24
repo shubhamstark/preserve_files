@@ -1,7 +1,14 @@
 #!/bin/bash
 # Test script for preserve.sh approach with S3
 # Simulates the Apply -> Verify Plan workflow with S3 preservation
-rm generated/example.txt & rm generated/config.json
+rm -r generated 
+rm -r scripts 
+rm -r test_temp 
+rm -r temp 
+rm -r docs 
+rm -r build 
+
+
 terraform apply -auto-approve   
 
 set +e  # Don't exit on error - we want to report where it failed
