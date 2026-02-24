@@ -196,6 +196,50 @@ list_tar_contents() {
     return 0
 }
 
+# Function to extract a tar archive
+# Usage: extract_tar "archive.tar.gz" [destination_dir]
+extract_tar() {
+    local tar_file="$1"
+    local dest_dir="${2:-.}"
+    
+    if [[ ! -f "$tar_file" ]]; then
+        echo "Error: Archive not found: $tar_file" >&2
+        return 1
+    fi
+    
+    echo ""
+    echo "=== Extracting tar archive ==="
+    echo "Archive: $tar_file"
+    echo "Destination: $dest_dir"
+    
+    # Create destination directory if needed
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+    
+    # Extract based on compression type
+    if [[ "$tar_file" == *.tar.gz || "$tar_file" == *.tgz ]]; then
+        echo "Extracting gzip compressed archive..."
+        tar -xzf "$tar_file" -C "$dest_dir"
+    elif [[ "$tar_file" == *.tar.bz2 ]]; then
+        echo "Extracting bzip2 compressed archive..."
+        tar -xjf "$tar_file" -C "$dest_dir"
+    else
+        echo "Extracting uncompressed archive..."
+        tar -xf "$tar_file" -C "$dest_dir"
+    fi
+    
+    local exit_code=$?
+    
+    if [[ $exit_code -eq 0 ]]; then
+        echo "✓ Archive extracted successfully"
+        return 0
+    else
+        echo "✗ Error: Failed to extract archive" >&2
+        return 1
+    fi
+}
+
 # Main execution
 main() {
     local command="${1:-}"
@@ -222,6 +266,17 @@ main() {
             fi
             list_tar_contents "$tar_file"
             ;;
+        extract|untar)
+            shift
+            local tar_file="$1"
+            local dest_dir="${2:-.}"
+            if [[ -z "$tar_file" ]]; then
+                echo "Error: Tar file path required" >&2
+                echo "Usage: $0 extract <tar_file> [destination_dir]" >&2
+                exit 1
+            fi
+            extract_tar "$tar_file" "$dest_dir"
+            ;;
         --help|-h)
             cat <<EOF
 Usage: $0 <command> [options]
@@ -230,6 +285,8 @@ Commands:
   tar <file_list> <output_tar>    Create tar from space/newline separated file list
   preserve [output_tar]           Auto-collect files and create tar (default: preserved_files.tar.gz)
   list <tar_file>                 List contents of a tar archive
+  extract <tar_file> [dest_dir]   Extract tar archive (default dest: current directory)
+  untar <tar_file> [dest_dir]     Alias for extract
   --help                          Show this help message
 
 Examples:
@@ -242,6 +299,10 @@ Examples:
   
   # List archive contents
   $0 list preserved_files.tar.gz
+  
+  # Extract archive
+  $0 extract preserved_files.tar.gz
+  $0 untar preserved_files.tar.gz /tmp/restore
 
 Description:
   This script creates tar archives from file lists. The 'preserve' command

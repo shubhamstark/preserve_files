@@ -3,6 +3,10 @@
 
 set -e  # Exit on error
 
+# Source tar_preserving_files.sh for tar functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/tar_preserving_files.sh"
+
 # Check if AWS CLI is installed
 check_aws_cli() {
     if ! command -v aws &> /dev/null; then
@@ -35,7 +39,7 @@ push() {
     # Step 1: Create tar archive
     echo ""
     echo "=== PUSH: Creating tar archive ==="
-    if ! bash tar.sh tar "$archive_name"; then
+    if ! get_preserving_tar "$archive_name"; then
         echo "Error creating tar" >&2
         return 1
     fi
@@ -92,7 +96,7 @@ pull() {
     # Step 2: Extract tar archive
     echo ""
     echo "=== PULL: Extracting tar archive ==="
-    if ! bash tar.sh untar "$archive_name"; then
+    if ! extract_tar "$archive_name"; then
         echo "Error extracting tar" >&2
         return 1
     fi
